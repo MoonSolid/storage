@@ -20,4 +20,17 @@ fork 하고 clone해오는게 안전함
 
 빈 원격 저장소 생성> 책임자가 기본 프로젝트 구저 생성 > 협업자들 모두가 빈 원격 저장소를 clone하여 작업 진행
 
-책임자가 기존에 작업해놓은 
+ 
+
+git tag: 특정 commit을 참조하는 이름 붙이기
+
+git commit --amend : git commit 메세지 수정하기
+
+git revert: 공개된 commit의 변경 내역을 되돌리기
+
+git reset:이전 작업 결과를 저장한 상태로 되돌리기
+
+git checkout HEAD -filename:특정 파일을 최종 commit 시점으로 되돌리기
+
+git rebase : branch 이력을 확인하면서 병합하기
+
