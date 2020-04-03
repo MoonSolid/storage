@@ -1,0 +1,25 @@
+```
+SQL 오류 (1005): Can't create table 'mydrug.#sql-950_9' (errno: 150)
+
+Foreign key constraint is incorrectly formed 
+```
+
+외래키를 설정할 때 참조데이터가 다를 경우 발생하는 오류
+
+
+
+1. 데이터 타입이 같은지 확인 (unsigned/signed)INT,VARCHAR 등 
+
+
+
+2. NULL값 허용여부 확인
+
+
+
+3. 참조받는 데이터가 unique, primary key 가 아닌지 확인
+
+
+
+4. 테이블의 조합확인 
+
+- 하나는 euckr_korean_ci 하나는 utf_general_ci 여서 오류가 발생했다.
