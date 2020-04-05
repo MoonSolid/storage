@@ -1610,7 +1610,7 @@ ALTER TABLE pf_recommendation
 		REFERENCES pf_members ( -- 회원
 			member_no -- 회원번호
 		);
-
+-
 -- 팔로잉
 ALTER TABLE pf_following
 	ADD CONSTRAINT FK_pf_members_TO_pf_following -- 회원 -> 팔로잉
