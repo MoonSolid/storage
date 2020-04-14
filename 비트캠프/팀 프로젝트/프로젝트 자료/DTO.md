@@ -13,7 +13,7 @@ Major 완료  -  pf_major 전공
 - major_no int 
 - name varchar(255) 
 
-EmploymentStatus 완료 - pf_	employment_status 고용형태  
+EmploymentStatus 완료 - pf_	employment_status 고용형태
 - employment_stat_no int PK
 - employment_stat_name varchar(40)
 
