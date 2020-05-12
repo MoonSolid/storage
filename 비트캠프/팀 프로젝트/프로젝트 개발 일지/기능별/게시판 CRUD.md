@@ -277,7 +277,196 @@ public interface JobPostingFileDao {
 
 ---
 
-### 6) Service 인터페이스 생성
+### 6) Mapper에서 DB와 DAO메서드 연동
+
+```xml
+<!-- JobPosting -->
+<insert id="insert" parameterType="JobPosting" 
+  useGeneratedKeys="true" keyColumn="job_posting_no" keyProperty="jobPostingNumber">
+  insert into pf_job_posting( 
+  title,
+  content,
+  minimum_career,
+  job,
+  year_salary,
+  start_dated,
+  end_dated,
+  view_count) <!-- view_count 기본값으로 0 추가 -->
+  values(
+  #{title},
+  #{content},
+  #{minimumCareer},
+  #{job},
+  #{yearSalary},
+  #{startDated},
+  #{endDated},
+  0)
+  </insert>
+
+  <select id="findAll" resultMap="JobPostingMap">
+   select
+     j.job_posting_no,
+     j.title,
+     j.content,
+     j.minimum_career,
+     j.job,
+     j.year_salary,
+     j.start_dated,
+     j.end_dated,
+     j.view_count,
+     f.file_path
+   from
+     pf_job_posting j <!-- 리스트에서 파일을 출력하기위해 job_postinf_file을 outer join -->
+     left outer join pf_job_posting_file f on j.job_posting_no=f.job_posting_no
+      <!-- job_posting을 왼쪽기준으로 조인 -->
+   where 
+     end_dated > now() <!-- 마감일을 넘겼을 경우는 출력하지않는다. -->
+  order by
+    j.job_posting_no desc 
+  limit 0, 5 <!-- 한번에 5개의 게시글만 출력하도록 limit 설정 -->
+  </select>
+  
+  <update id="plusCnt" parameterType="int"> <!-- 조회수 처리하는 쿼리문 -->
+    update pf_job_posting
+    set
+    view_count = view_count + 1 where job_posting_no = #{jobPostingNumber} 
+      <!-- jobPostingNumber를 파라미터로 받아서 해당 게시글의 view_count 1증가 -->
+  </update>
+  
+  <select id="findMore" resultMap="JobPostingMap" parameterType="int"> 
+      <!-- 게시글 더보기 메서드 -->      
+  <![CDATA[
+   select
+     j.job_posting_no,
+     j.title,
+     j.content,
+     j.minimum_career,
+     j.job,
+     j.year_salary,
+     j.start_dated,
+     j.end_dated,
+     j.view_count,
+     f.file_path
+   from
+     pf_job_posting j
+     left outer join pf_job_posting_file f on j.job_posting_no=f.job_posting_no
+   where 
+     end_dated > now() and j.job_posting_no < #{lastNo} 
+  order by
+    j.job_posting_no desc 
+  limit 0, 5
+  ]]>
+      <!-- 리스트와 유사하지만 파라미터로 lastNo를 받아 lastNo보다 작은 게시글만 5개씩 출력하도록했다.-->
+  </select>
+     
+
+  <select id="findByNo" resultMap="JobPostingMap" parameterType="int"> 
+      <!-- detail 쿼리문 -->
+  select
+     j.job_posting_no,
+     j.title,
+     j.content,
+     j.minimum_career,
+     j.job,
+     j.year_salary,
+     j.start_dated,
+     j.end_dated,
+     j.view_count,
+     f.file_path
+   from pf_job_posting j
+     left outer join pf_job_posting_file f on j.job_posting_no=f.job_posting_no
+   where
+   j.job_posting_no=#{jobPostingNumber} <!-- 파라미터를 받아 해당 게시글을 출력한다. -->
+  </select>
+  
+  <update id="update" parameterType="JobPosting">
+      <!-- update 쿼리문 - 객체를 받아서 업데이트한다. -->
+  update pf_job_posting
+  <set>
+  <if test="title != null and title != ''">title=#{title},</if>
+  <if test="content != null and content != ''">content=#{content},</if>
+  <if test="minimumCareer > 0">minimum_career=#{minimumCareer},</if>
+  <if test="job != null and job != ''">job=#{job},</if>
+  <if test="yearSalary > 0">year_salary=#{yearSalary},</if>
+  <if test="startDated != null">start_dated=#{startDated},</if>
+  <if test="endDated != null">end_dated=#{endDated}</if>  
+  </set>
+   where job_posting_no=#{jobPostingNumber}
+  </update>
+  
+  <delete id="delete" parameterType="int">
+      <!-- delete 쿼리문 -->
+   delete from pf_job_posting
+   where 
+      job_posting_no=#{jobPostingNumber}
+  </delete>
+  
+  <select id="findByKeyword" 
+  resultMap="JobPostingMap"
+  parameterType="string">
+  <bind name="keywordPattern" value="'%' + _parameter + '%'"/>
+  select
+   j.job_posting_no,
+   j.title,
+   j.content,
+   j.minimum_career,
+   j.start_dated,
+   j.end_dated,
+   j.job,
+   j.year_salary,
+   j.view_count,
+   f.file_path
+  from
+   pf_job_posting j
+   left outer join pf_job_posting_file f on j.job_posting_no=f.job_posting_no
+  where
+   j.title like #{keywordPattern}
+   or j.content like #{keywordPattern}
+   or j.minimum_career like #{keywordPattern}
+   or j.start_dated like #{keywordPattern}
+   or j.end_dated like #{keywordPattern}
+   or j.job like #{keywordPattern}
+   or j.year_salary like #{keywordPattern}
+  </select>
+```
+
+```xml
+<!-- JobPostingFile -->
+<insert id="insert" parameterType="JobPosting">
+      <!-- job_posting_file - list 쿼리문-->
+    insert into pf_job_posting_file(job_posting_no,file_path) 
+    values
+    <foreach collection="files" item="file" separator=","> 
+      (#{jobPostingNumber}, #{file.filePath})
+    </foreach>
+  </insert>
+  
+  <select id="findAll" resultMap="JobPostingFileMap" parameterType="int"> 
+      <!-- job_posting_file - insert 쿼리문-->
+    select 
+      job_posting_file_no, 
+      job_posting_no, 
+      file_path
+    from 
+      pf_job_posting_file
+    where 
+      job_posting_no=#{jobPostingNumber}
+    order by 
+      job_posting_file_no asc
+  </select>
+
+  <delete id="deleteAll" parameterType="int">
+      <!-- job_posting_file - delete 쿼리문-->
+    delete from pf_job_posting_file
+    where job_posting_no=#{jobPostingNumber}
+  </delete>
+```
+
+
+
+---
+
+### 7) Service 인터페이스 생성
 
 ```java
 //인터페이스는 실제작업을 처리하지않고 파라미터를 전달할 메서드를 구현해서
@@ -306,7 +495,7 @@ public interface JobPostingService {
 
 ---
 
-### 7) 인터페이스 구현체 생성
+### 8) 인터페이스 구현체 생성
 
 ```java
 @Component
@@ -390,7 +579,7 @@ public class JobPostingServiceImpl implements JobPostingService {
 
 ---
 
-### 8) 실제 작업을 하는 Controller 생성
+### 9) 실제 작업을 하는 Controller 생성
 
 ```java
 //애노테이션을 통해 Controller임을 명시한다.
@@ -463,45 +652,50 @@ public class JobPostingController {
   @GetMapping("delete")
   public String delete(int no) throws Exception { //파라미터로 no를 받아 Serivce를 통해 DAO로 
     jobPostingService.delete(no);
-    return "redirect:list";
+    return "redirect:list"; //작업후 바로 list로 넘어간다 
   }
 
   //@RequestParam(defaultValue = "1")은 파라미터의 값이 없을 경우 dafaultValue를 설정해준다.
   @GetMapping("detail") //
   public void detail(@RequestParam(defaultValue = "1") int no, Model model) throws Exception {
-    jobPostingService.plusCnt(no);
-    model.addAttribute("jobPosting", jobPostingService.get(no));
+      //파라미터로 no를 받아서
+    jobPostingService.plusCnt(no);  //plusCnt메서드에 담아 Service로 넘긴다. 
+    model.addAttribute("jobPosting", jobPostingService.get(no)); 
   }
 
+    
+  //Model객체는 Map처럼 사용한다.
   @GetMapping("list")
   public void list(Model model) throws Exception {
-    List<JobPosting> jobPostings = jobPostingService.list();
-    model.addAttribute("list", jobPostings);
+    List<JobPosting> jobPostings = jobPostingService.list(); //리스트를 담아 저장후
+    model.addAttribute("list", jobPostings); //list로 저장한다.
   }
 
   @GetMapping("list2")
   public void list2(@RequestParam(defaultValue = "1") int lastNo, Model model) throws Exception {
-    List<JobPosting> jobPostings = jobPostingService.list2(lastNo);
+    List<JobPosting> jobPostings = jobPostingService.list2(lastNo); //게시글 더보기 처리
     model.addAttribute("list", jobPostings);
   }
 
   @GetMapping("search")
-  public void search(String keyword, Model model) throws Exception {
+  public void search(String keyword, Model model) throws Exception { 
+    //파라미터로 키워드를 받아 키워드검색 처리
     model.addAttribute("list", jobPostingService.search(keyword));
   }
 
   @GetMapping("updateForm")
-  public void updateForm(int no, Model model) throws Exception {
+  public void updateForm(int no, Model model) throws Exception { 
+  //파라미터로 no를 받아서 해당 게시글의 updateForm으로 이동
     model.addAttribute("jobPosting", jobPostingService.get(no));
   }
 
   @PostMapping("update")
   public String update(//
-      int no, //
-      JobPosting jobPosting, //
+      int no, //파라미터로 no를 받아서 해당 게시글을 업데이트
+      JobPosting jobPosting, // 객체와 파일을 입력받는다
       MultipartFile[] jobPostingFiles) throws Exception {
 
-    jobPosting = jobPostingService.get(no);
+    jobPosting = jobPostingService.get(no); 
 
     ArrayList<JobPostingFile> files = new ArrayList<>();
     String dirPath = servletContext.getRealPath("/upload/jobposting");
@@ -525,17 +719,242 @@ public class JobPostingController {
 
     }
 
-    if (files.size() > 0) {
+    if (files.size() > 0) { 
       jobPosting.setFiles(files);
     } else {
-      jobPosting.setFiles(null);
+      jobPosting.setFiles(null); //파일은 값이 없을경우 null로 저장
     }
 
-    jobPostingService.update(jobPosting);
-    return "redirect:list";
+    jobPostingService.update(jobPosting); //업데이트가 완료되면 Service를 통해 객체를 업데이트
+    return "redirect:list"; //list로 redirect
   }
 }
 
+```
+
+---
+
+### 10) 프론트에서 사용자 입력을 처리할 JSP 생성
+
+```jsp
+<!-- form.jsp -->
+<!-- Controller에서 메서드와 링크를 Mapping해줬기 때문에 form요청이 들어오면 이 jsp가 화면에 출력된다-->
+<!-- header.jsp와 footer.jsp를 including 해줬다.-->
+<!-- 이 jsp는 사용자로부터 값을 입력받는 역할이다.-->
+
+<jsp:include page="../header.jsp" />
+
+<div class="container">
+	<h1>채용공고등록</h1>
+	<form action='add' id="form1" method='post'
+		enctype='multipart/form-data'>
+
+		
+		<div class="col-sm-13">
+		제목*  <input id="title" placeholder="제목" class="form-control" name='title'
+				type='text'><br>  <!-- input 태그로 값을 입력받는다. -->
+		</div>
+
+		
+		<div class="col-sm-13">
+		내용*	<textarea id="content" placeholder="내용" class="form-control"
+				name='content' rows='10' cols='60'></textarea>
+		</div>
+    <br>
+
+		<div class="col-sm-13">
+			<input id="minimumCareer" placeholder="최소경력(숫자만 입력가능)"
+				name='minimumCareer' type='number' class="form-control"><br>
+		</div>
+
+		<div class="col-sm-13">
+			<input placeholder="직무" id="job" name='job' type='text'
+				class="form-control" /> <label for="job"></label>
+		</div>
+
+		<!-- 연봉(숫자만 입력가능): <input id="yearSalary" name='yearSalary' type='number' class="form-control">만원<br> -->
+		시작일*<input id="startDated" name='startDated' type='date' class="form-control"><br>
+		마감일*<input id="endDated" name='endDated' type='date' class="form-control"><br>
+		이미지 첨부*<input id="jobPostingFiles" name='jobPostingFiles' type='file' class="form-control"><br>
+
+		<button id="btn1" class="btn btn-primary btn-lg btn-block">등록</button>
+</div>
+</form>
+
+<jsp:include page="../footer.jsp" />
+```
+
+```jsp
+<!-- list.jsp -->
+<!-- Controller에서 메서드와 링크를 Mapping해줬기 때문에 list요청이 들어오면 이 jsp가 화면에 출력된다-->
+<!-- header.jsp와 footer.jsp를 including 해줬다.-->
+<!-- 이 jsp는 사용자에게 DB의 값을 리스트로 출력해주는 역할이다.-->
+
+<jsp:include page="../header.jsp" />
+
+<div class="container">
+<h1>채용정보</h1>
+<div id="searchForm" style="text-align:right">
+<form action='search' method='get' >
+	<input id='keyword' name='keyword' type='text' >
+	<button>검색</button> 
+</form>
+</div>
+<hr>
+
+<div style="text-align:center">
+<table id="listTable" class="table table-striped table-hover"> 
+    <!-- 테이블 형태로 값을 출력해준다. -->
+        <!-- th태그로 카테고리를 정하고 td태그로 해당 카테고리의 값을 출력한다. -->
+	<thead>
+	  <th></th>
+		<th>no</th>
+		<th>제목</th>
+		<th>내용</th>
+		<!--  <th>최소경력</th>-->
+		<!--  <th>직무</th> -->
+		<!--  <th>연봉</th> -->
+		<th>시작일</th>
+		<th>마감일</th>
+		<th>조회수</th>
+	</thead>
+
+	<tbody>
+    <!-- forEach 반복문으로 list의 값을 출력 -->
+	<c:forEach items="${list}" var="item" varStatus="status">
+    <tr id="tList">  
+    <td><a href='detail?no=${item.jobPostingNumber}'><c:forEach items="${item.files}" var="jobPostingFile">    
+      <img src="../../upload/jobposting/${jobPostingFile.filePath}_300x300.jpg" width="200" height="200">
+      </c:forEach></td>
+        <!-- 중첩반복문으로 list내에서 파일도 반복문을 돌리며 값을 가져온다. -->
+        <!-- 파일의 이름을 저장한 이름으로 지정해서 가져온다. -->
+			<td>${item.jobPostingNumber}</td>			
+			<td><a href='detail?no=${item.jobPostingNumber}'>${item.title}</a></td>
+			<td>${item.content}</td>
+			<!-- <td>${item.minimumCareer}</td> -->
+			<!-- <td>${item.job}</td> -->
+			<!-- <td>${item.yearSalary}</td> -->
+			<td>${item.startDated}</td>
+			<td>${item.endDated}</td>
+			<td>${item.viewCount}</td>
+		</tr>
+	</c:forEach>
+  </tbody>
+</table>
+</div>
+
+<button id="moreListBtn" class="btn btn-primary btn-lg btn-block">더보기</button>
+
+<hr>
+<div style="text-align:right">
+<a href='form' class="btn btn-primary pull-right">글쓰기</a>
+</div>
+<br>
+</div>
+```
+
+```jsp
+<!-- detail.jsp -->
+<!-- Controller에서 메서드와 링크를 Mapping해줬기때문에 detail요청이 들어오면 이 jsp가 화면에 출력된다-->
+<!-- header.jsp와 footer.jsp를 including 해줬다.-->
+<!-- 이 jsp는 사용자가 원하는 게시글의 DB의 값을 조회할수있도록 출력해주는 역할이다.-->
+
+<jsp:include page="../header.jsp"/>
+
+
+<c:if test="${not empty jobPosting}">  
+<!-- if문으로 해당 게시글이 있을경우 출력하고 없으면 게시글이 없다는 안내 문구를 출력한다.-->
+<div class="container">
+<hr>
+<h2>${jobPosting.title}<br></h2><br>
+<hr>
+<h3>상세요강</h3>
+<p>
+<c:forEach items="${jobPosting.files}" var="jobPostingFile">
+<img src="${pageContext.servletContext.contextPath}/upload/jobposting/${jobPostingFile.filePath}" width="100%" height="600">
+</c:forEach>
+</p>
+
+${jobPosting.content}<br>
+<hr>
+시작일: ${jobPosting.startDated}<br>
+마감일: ${jobPosting.endDated}<br>
+<!-- 
+최소경력: ${jobPosting.minimumCareer}<br>
+직무: ${jobPosting.job}<br>
+연봉: ${jobPosting.yearSalary}<br>
+ -->
+조회수: ${jobPosting.viewCount}<br>
+<hr>
+  
+
+<p>
+<a href='updateForm?no=${jobPosting.jobPostingNumber}' class="btn btn-primary pull-right">수정</a>  
+<!-- 수정버튼에 updateForm으로 이동하는 링크를 걸었다. -->
+<a href='delete?no=${jobPosting.jobPostingNumber}' id="delBtn" class="btn btn-primary pull-right">삭제</a>
+<!-- 삭제버튼에 해당 게시글을 삭제하도록 링크를 걸었다. -->  
+</p>
+
+</div>
+</c:if>
+
+<c:if test="${empty jobPosting}">
+<p>해당 공고가 없습니다.</p>
+</c:if>
+```
+
+```jsp
+<!-- updateForm.jsp -->
+<!-- Controller에서 메서드와 링크를 Mapping해줬기 때문에 updateForm요청이 들어오면 이 jsp가 화면에 출력된다-->
+<!-- header.jsp와 footer.jsp를 including 해줬다.-->
+<!-- 이 jsp는 사용자가 원하는 게시글의 값을 변경할 수 있도록 값을 입력받아 업데이트하는 역할이다.-->
+
+<jsp:include page="../header.jsp"/>
+
+
+<c:if test="${not empty jobPosting}"> <!-- 마찬가지로 jobPosting이 있을경우에만 출력-->
+
+<div class="container">
+<h1>공고 변경</h1>
+<form action='update' method='post' enctype='multipart/form-data'> 
+                                  <!-- 사진을 입력받을땐 multipart로 해준다.-->
+
+<input name='no' readonly type='hidden' value='${jobPosting.jobPostingNumber}'><br>
+                   <!-- jobPostingNumber의 값은 받아야하지만 보여주진 않기위해 hidden으로 걸었다.-->
+<div class="col-sm-13">
+제목* <input name='title' placeholder="제목" class="form-control" type='text' value='${jobPosting.title}'><br>   <!-- input 태그로 값을 입력받는다. -->
+</div>
+
+<div class="col-sm-13">
+내용* <textarea name='content' class="form-control" rows='5' cols='60'>${jobPosting.content}</textarea><br>
+</div>
+
+<div class="col-sm-13">
+<input name='minimumCareer' placeholder="최소경력(숫자만 입력가능)" type='number' class="form-control" value='${jobPosting.minimumCareer}'><br>
+                <!-- value는 기존 설정값이다. 값이 입력되지않으면 기존의 값으로 설정된다. -->                                                                                      
+</div>
+
+<div class="col-sm-13">
+<input name='job' placeholder="직무" class="form-control" type='text' value='${jobPosting.job}'><br>
+</div>
+
+
+<!-- <input name='yearSalary' type='number' value='${jobPosting.yearSalary}'><br> -->
+시작일<input name='startDated' type='date' class="form-control" value='${jobPosting.startDated}'><br>
+마감일<input name='endDated' type='date' class="form-control" value='${jobPosting.endDated}'><br>
+
+이미지 첨부<input name='jobPostingFiles' type='file' class="form-control"><br>
+
+<p>
+<button id="cBtn" class="btn btn-primary btn-lg btn-block">변경</button>
+</p>
+</div>
+</form>
+</c:if>
+
+<c:if test="${empty jobPosting}">
+<p>해당 게시글이 없습니다.</p>
+</c:if>
 ```
 
 
