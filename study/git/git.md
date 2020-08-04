@@ -55,7 +55,7 @@ core.autocrlf=true //true인경우 깃에서 개행문자를 알아서 처리해
 #### git add 
 
 - 파일을 준비영역(Staging Area)로 옮긴다. 
-- . 옵션은 워킹 디렉토리 내 모든 파일을 추가
+- 옵션은 워킹 디렉토리 내 모든 파일을 추가
 
 #### git rm -r --cached .
 
@@ -162,6 +162,10 @@ core.autocrlf=true //true인경우 깃에서 개행문자를 알아서 처리해
 #### git tag 0.9 48eb7
 
 - checksum값인 48eb7의 commit에  "0.9" 태그를붙인다 (특정commit에  태그붙임)
+
+#### git reset HEAD^
+
+- 가장 최근의 커밋 내역 한개를 삭제한다. 끝의 HEAD에 ~2를 붙이면 최근 2개의 커밋 내역을 삭제한다.
 
 #### git reset --hard 48eb7
 
